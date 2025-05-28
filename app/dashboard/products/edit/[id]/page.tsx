@@ -160,7 +160,7 @@ export default function EditProductPage() {
         name: product.name || "",
         hindiName: product.hindiName || "",
         description: product.description || "",
-        category: (product as any).category._id || "",
+        category: product.category || "",
         variants: product.variants || [{ display: "", value: 0 }],
         price: product.price || [],
         cutoffPrice: product.cutoffPrice || [],
@@ -556,7 +556,7 @@ export default function EditProductPage() {
                   <Label htmlFor="category">Category*</Label>
                   <Select
                     onValueChange={(value) => form.setValue("category", value)}
-                    value={form.watch("category") || form.getValues("category") || ""}
+                    value={form.getValues("category")}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select a category" />
