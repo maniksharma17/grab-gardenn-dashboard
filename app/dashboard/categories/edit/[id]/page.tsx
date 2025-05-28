@@ -90,7 +90,7 @@ export default function EditCategoryPage() {
   const router = useRouter();
 
   // Handle form state for arrays
-  const [category, setCategory] = useState<Partial<CategoryFormValues>>({});
+  const [category, setCategory] = useState<any>({});
   const [allProducts, setAllProducts] = useState<ProductType[]>([]);
   const [selectedProducts, setSelectedProducts] = useState<any[]>([]);
 
@@ -135,7 +135,7 @@ export default function EditCategoryPage() {
         name: category.name || "",
         description: category.description || "",
         image: category.image || "",
-        products: category.products || [],
+        products: category.products?.map((p: any) => p._id) || [],
         _id: category._id || "",
         createdAt: category.createdAt || "",
       });
