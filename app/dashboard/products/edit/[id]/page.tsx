@@ -559,7 +559,7 @@ export default function EditProductPage() {
                       onValueChange={(value) =>
                         form.setValue("category", value)
                       }
-                      value={form.watch("category")}
+                      value={form.getValues("category")}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Select a category" />
