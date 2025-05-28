@@ -383,14 +383,14 @@ export default function EditProductPage() {
   ) => {
     const updated = [...getter];
     updated[index] =
-      (formField === "price" || formField === "cutoffPrice")
+      formField === "price" || formField === "cutoffPrice"
         ? parseFloat(value)
         : value.toString();
     setter(updated);
 
     const formValues = [...form.getValues(formField as any)];
     formValues[index] =
-      (formField === "price" || formField === "cutoffPrice")
+      formField === "price" || formField === "cutoffPrice"
         ? parseFloat(value)
         : value.toString();
     form.setValue(formField as any, formValues);
@@ -552,29 +552,33 @@ export default function EditProductPage() {
                   )}
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="category">Category*</Label>
-                  <Select
-                    onValueChange={(value) => form.setValue("category", value)}
-                    value={form.watch("category")}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.map((category) => (
-                        <SelectItem key={category._id} value={category._id}>
-                          {category.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {form.formState.errors.category && (
-                    <p className="text-sm text-red-500">
-                      {form.formState.errors.category.message}
-                    </p>
-                  )}
-                </div>
+                {product && categories.length > 0 && (
+                  <div className="space-y-2">
+                    <Label htmlFor="category">Category*</Label>
+                    <Select
+                      onValueChange={(value) =>
+                        form.setValue("category", value)
+                      }
+                      value={form.watch("category")}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categories.map((category) => (
+                          <SelectItem key={category._id} value={category._id}>
+                            {category.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {form.formState.errors.category && (
+                      <p className="text-sm text-red-500">
+                        {form.formState.errors.category.message}
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   <Label htmlFor="stock">Stock Quantity*</Label>
@@ -1092,7 +1096,6 @@ export default function EditProductPage() {
                               }
                             }}
                           />
-                          
                         </div>
                       </div>
 
