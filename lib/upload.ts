@@ -8,17 +8,17 @@ export async function uploadToS3(file: File) {
   const { uploadUrl, fileUrl } = await res.json();
 
   // 2. Upload to S3
-  // const uploadRes = await fetch(uploadUrl, {
-  //   method: 'PUT',
-  //   headers: {
-  //     'Content-Type': fileType,
-  //   },
-  //   body: file,
-  // });
+  const uploadRes = await fetch(uploadUrl, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': fileType,
+    },
+    body: file,
+  });
 
-  // if (!uploadRes.ok) {
-  //   throw new Error('Upload failed');
-  // }
+  if (!uploadRes.ok) {
+    throw new Error('Upload failed');
+  }
 
   return fileUrl;
 }
