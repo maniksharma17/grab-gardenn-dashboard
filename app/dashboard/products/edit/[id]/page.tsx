@@ -26,7 +26,6 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { createProduct } from "@/lib/api";
 import { ArrowLeft, ImageIcon, Plus, Trash } from "lucide-react";
 import Link from "next/link";
 import axios from "axios";
@@ -161,7 +160,7 @@ export default function EditProductPage() {
         name: product.name || "",
         hindiName: product.hindiName || "",
         description: product.description || "",
-        category: product.category || "",
+        category: (product as any).category._id || "",
         variants: product.variants || [{ display: "", value: 0 }],
         price: product.price || [],
         cutoffPrice: product.cutoffPrice || [],
