@@ -556,7 +556,7 @@ export default function EditProductPage() {
                   <Label htmlFor="category">Category*</Label>
                   <Select
                     onValueChange={(value) => form.setValue("category", value)}
-                    value={form.getValues("category")}
+                    value={form.watch("category")}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select a category" />
