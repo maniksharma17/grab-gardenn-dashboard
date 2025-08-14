@@ -39,8 +39,6 @@ const CategorySchema = z.object({
   image: z.string().optional(),
   description: z.string().optional(),
   products: z.array(z.string()).optional(),
-  _id: z.string(),
-  createdAt: z.string()
 });
 
 type CategoryFormValues = z.infer<typeof CategorySchema>;
