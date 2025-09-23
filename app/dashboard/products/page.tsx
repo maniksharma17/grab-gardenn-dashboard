@@ -46,12 +46,12 @@ export default function ProductsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
-  const productsPerPage = 100;
+  const productsPerPage = 15;
 
   useEffect(() => {
     const loadProducts = async () => {
       try {
-        const data = await axios.get(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/products`);
+        const data = await axios.get(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/products?limit=100`);
         setProducts(data.data.products);
         setFilteredProducts(data.data.products);
       } catch (error) {
