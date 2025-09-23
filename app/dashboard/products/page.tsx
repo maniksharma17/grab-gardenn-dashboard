@@ -46,7 +46,7 @@ export default function ProductsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
-  const productsPerPage = 10;
+  const productsPerPage = 100;
 
   useEffect(() => {
     const loadProducts = async () => {
@@ -122,85 +122,8 @@ export default function ProductsPage() {
     paginationItems.push(i);
   }
 
-  // Mock data when API is not available
-  const mockProducts: ProductData[] = [
-    {
-      _id: '1',
-      name: 'Organic Bajra',
-      hindiName: 'जैविक बाजरा',
-      category: { _id: 'c1', name: 'Millets' },
-      price: [99, 199, 499],
-      variants: [
-        { display: '500g', value: 0 },
-        { display: '1kg', value: 1 },
-        { display: '3kg', value: 2 }
-      ],
-      stock: 25,
-      images: ['https://images.pexels.com/photos/1393382/pexels-photo-1393382.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1'],
-      createdAt: '2023-05-15T12:30:00Z'
-    },
-    {
-      _id: '2',
-      name: 'Brown Sugar',
-      hindiName: 'भूरी चीनी',
-      category: { _id: 'c2', name: 'Sugar' },
-      price: [149, 299],
-      variants: [
-        { display: '500g', value: 0 },
-        { display: '1kg', value: 1 }
-      ],
-      stock: 40,
-      images: ['https://images.pexels.com/photos/5946083/pexels-photo-5946083.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1'],
-      createdAt: '2023-05-16T10:15:00Z'
-    },
-    {
-      _id: '3',
-      name: 'Basmati Rice',
-      hindiName: 'बासमती चावल',
-      category: { _id: 'c3', name: 'Rice' },
-      price: [399, 799, 1199],
-      variants: [
-        { display: '1kg', value: 0 },
-        { display: '2kg', value: 1 },
-        { display: '5kg', value: 2 }
-      ],
-      stock: 15,
-      images: ['https://images.pexels.com/photos/4110251/pexels-photo-4110251.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1'],
-      createdAt: '2023-05-17T14:45:00Z'
-    },
-    {
-      _id: '4',
-      name: 'Organic Jowar',
-      hindiName: 'जैविक ज्वार',
-      category: { _id: 'c1', name: 'Millets' },
-      price: [129, 249, 599],
-      variants: [
-        { display: '500g', value: 0 },
-        { display: '1kg', value: 1 },
-        { display: '3kg', value: 2 }
-      ],
-      stock: 30,
-      images: ['https://images.pexels.com/photos/1537169/pexels-photo-1537169.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1'],
-      createdAt: '2023-05-18T11:20:00Z'
-    },
-    {
-      _id: '5',
-      name: 'Palm Sugar',
-      hindiName: 'ताड़ की चीनी',
-      category: { _id: 'c2', name: 'Sugar' },
-      price: [199, 389],
-      variants: [
-        { display: '500g', value: 0 },
-        { display: '1kg', value: 1 }
-      ],
-      stock: 22,
-      images: ['https://images.pexels.com/photos/6412919/pexels-photo-6412919.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1'],
-      createdAt: '2023-05-19T09:10:00Z'
-    }
-  ];
-
   // Use mock data if no products loaded
-  const displayProducts = currentProducts.length > 0 ? currentProducts : mockProducts;
+  const displayProducts = currentProducts.length > 0 ? currentProducts : [];
 
   return (
     <div className="space-y-6">
