@@ -121,7 +121,7 @@ export default function EditCategoryPage() {
   useEffect(() => {
     const fetchProducts = async () => {
       const response = await axios.get(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/products`
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/products?limit=100`
       );
       setAllProducts(response.data.products);
     };

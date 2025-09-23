@@ -70,7 +70,7 @@ export default function AddCategoryPage() {
     const fetchProducts = async () => {
       try {
         const response = await axios.get(
-          `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/products`
+          `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/products?limit=100`
         );
         setAllProducts(response.data.products || []);
       } catch (err) {
