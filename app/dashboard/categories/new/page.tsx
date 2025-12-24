@@ -1,29 +1,47 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import axios from "axios";
-import Link from "next/link";
-import { ArrowLeft, Trash } from "lucide-react";
-
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Card,
   CardContent,
+  CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import axios from "axios";
+import Image from "next/image";
+import Link from "next/link";
+import { ArrowLeft, Trash } from "lucide-react";
+import { uploadToS3 } from "@/lib/upload";
+import { useRouter } from "next/navigation";
+import { error } from "console";
+import { create } from "domain";
 
-/* -------------------------------------------------------------------------- */
-/*                                   TYPES                                    */
-/* -------------------------------------------------------------------------- */
+// Schema
+const CategorySchema = z.object({
+  name: z.string().min(2, "Name is required"),
+  image: z.string().optional(),
+  description: z.string().optional(),
+  products: z.array(z.string()).optional(),
+});
 
-type PromoMode = "FLAT" | "PERCENT" | "BUNDLE";
+type CategoryFormValues = z.infer<typeof CategorySchema>;
 
 type ProductType = {
   _id: string;
@@ -31,365 +49,232 @@ type ProductType = {
   images: string[];
 };
 
-/* -------------------------------------------------------------------------- */
-/*                               MAIN COMPONENT                               */
-/* -------------------------------------------------------------------------- */
-
-export default function NewPromoCodePage() {
-  const router = useRouter();
+export default function AddCategoryPage() {
   const { toast } = useToast();
-
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [allProducts, setAllProducts] = useState<ProductType[]>([]);
   const [selectedProducts, setSelectedProducts] = useState<ProductType[]>([]);
+  const router = useRouter();
 
-  const [form, setForm] = useState({
-    code: "",
-    description: "",
-    promoMode: "FLAT" as PromoMode,
-
-    value: "",
-    maxDiscount: "",
-
-    bundleMinItems: "",
-    bundlePrice: "",
-
-    minimumOrder: "",
-    expiryDate: "",
-    maxUses: "",
-    oneTimeUsePerUser: false,
-    active: true,
+  const form = useForm<CategoryFormValues>({
+    resolver: zodResolver(CategorySchema),
+    defaultValues: {
+      name: "",
+      description: "",
+      image: "",
+      products: [],
+    },
   });
-
-  /* -------------------------------------------------------------------------- */
-  /*                               FETCH PRODUCTS                               */
-  /* -------------------------------------------------------------------------- */
 
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        const res = await axios.get(
-          `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/products?limit=200`
+        const response = await axios.get(
+          `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/products?limit=100`
         );
-        setAllProducts(res.data.products || []);
+        setAllProducts(response.data.products || []);
       } catch (err) {
-        console.error("Failed to fetch products", err);
+        console.error("Error fetching products:", err);
       }
     };
-
     fetchProducts();
   }, []);
 
-  /* -------------------------------------------------------------------------- */
-  /*                                  HANDLERS                                  */
-  /* -------------------------------------------------------------------------- */
-
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
-  ) => {
-    const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-
+  const onSubmit = async (values: CategoryFormValues) => {
+    setIsLoading(true);
     try {
-      const payload: any = {
-        code: form.code.toUpperCase(),
-        description: form.description,
-        promoMode: form.promoMode,
-        expiryDate: form.expiryDate,
-        minimumOrder: form.minimumOrder ? Number(form.minimumOrder) : 0,
-        maxUses: form.maxUses ? Number(form.maxUses) : undefined,
-        oneTimeUsePerUser: form.oneTimeUsePerUser,
-        active: form.active,
-      };
-
-      /* ----------------------------- PERCENT -------------------------------- */
-      if (form.promoMode === "PERCENT") {
-        payload.value = Number(form.value);
-        payload.maxDiscount = form.maxDiscount
-          ? Number(form.maxDiscount)
-          : undefined;
-      }
-
-      /* ------------------------------ FLAT ---------------------------------- */
-      if (form.promoMode === "FLAT") {
-        payload.value = Number(form.value);
-      }
-
-      /* ----------------------------- BUNDLE --------------------------------- */
-      if (form.promoMode === "BUNDLE") {
-        if (selectedProducts.length === 0) {
-          toast({
-            title: "Select products",
-            description: "Please select eligible products for bundle",
-            variant: "destructive",
-          });
-          setIsSubmitting(false);
-          return;
-        }
-
-        payload.bundle = {
-          minItems: Number(form.bundleMinItems),
-          bundlePrice: Number(form.bundlePrice),
-        };
-
-        payload.eligibleProducts = selectedProducts.map((p) => p._id);
-      }
-
-      await axios.post(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/promo-code`,
-        payload
+      const response = await axios.post(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/categories`,
+        values
       );
-
-      toast({
-        title: "Promo code created",
-        description: "Promo code has been created successfully",
-      });
-
-      router.push("/dashboard/promo-codes");
-    } catch (error) {
-      console.error(error);
+      toast({ title: "Category created successfully" });
+      router.push("/dashboard/categories");
+      form.reset();
+      setSelectedProducts([]);
+    } catch (err) {
+      console.error(err);
       toast({
         title: "Error",
-        description: "Failed to create promo code",
+        description: "Failed to create category",
         variant: "destructive",
       });
     } finally {
-      setIsSubmitting(false);
+      setIsLoading(false);
     }
   };
 
-  /* -------------------------------------------------------------------------- */
-  /*                                   UI                                       */
-  /* -------------------------------------------------------------------------- */
-
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <Link href="/dashboard/promo-codes">
-          <Button variant="outline" size="sm">
-            <ArrowLeft className="h-4 w-4 mr-2" /> Back
+    <div className="space-y-6">
+      <div className="flex items-center gap-2">
+        <Link href="/dashboard/categories">
+          <Button variant="outline" size="icon" className="h-8 w-8">
+            <ArrowLeft className="h-4 w-4" />
           </Button>
         </Link>
-        <h2 className="text-3xl font-bold">New Promo Code</h2>
+        <h2 className="text-3xl font-bold tracking-tight">Add New Category</h2>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Create Promo Code</CardTitle>
-        </CardHeader>
-
-        <CardContent>
-          <form onSubmit={handleSubmit} className="grid gap-6">
-            {/* Code */}
-            <div className="grid gap-2">
-              <Label>Code</Label>
+      <form onSubmit={form.handleSubmit(
+        (data) => {
+          onSubmit(data);
+        },
+        (errors) => {
+          console.error("Form errors:", errors);
+          toast({
+            title: "Error",
+            description: "Please fix the errors in the form",
+            variant: "destructive",
+          });
+        }
+      )}>
+        <Card className="w-full">
+          <CardHeader>
+            <CardTitle>Basic Information</CardTitle>
+            <CardDescription>
+              Fill in the basic information about the category.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4">
+            <div>
+              <Label htmlFor="name">Category Name</Label>
               <Input
-                name="code"
-                value={form.code}
-                onChange={handleChange}
-                required
-                className="uppercase"
+                id="name"
+                {...form.register("name")}
+                placeholder="Category Name"
+                disabled={isLoading}
               />
             </div>
 
-            {/* Description */}
-            <div className="grid gap-2">
-              <Label>Description</Label>
+            <div>
+              <Label htmlFor="description">Description</Label>
               <Textarea
-                name="description"
-                value={form.description}
-                onChange={handleChange}
+                id="description"
+                {...form.register("description")}
+                placeholder="Category Description"
+                disabled={isLoading}
               />
             </div>
 
-            {/* Promo Mode */}
-            <div className="grid gap-2">
-              <Label>Promo Type</Label>
-              <select
-                name="promoMode"
-                value={form.promoMode}
-                onChange={handleChange}
-                className="border rounded-md p-2"
-              >
-                <option value="FLAT">Flat Discount (₹)</option>
-                <option value="PERCENT">Percentage Discount (%)</option>
-                <option value="BUNDLE">Bundle Pricing</option>
-              </select>
-            </div>
-
-            {/* Conditional Fields */}
-            {form.promoMode === "PERCENT" && (
-              <>
-                <Input
-                  name="value"
-                  type="number"
-                  placeholder="Discount Percentage"
-                  value={form.value}
-                  onChange={handleChange}
-                  required
-                />
-                <Input
-                  name="maxDiscount"
-                  type="number"
-                  placeholder="Max Discount (₹)"
-                  value={form.maxDiscount}
-                  onChange={handleChange}
-                />
-              </>
-            )}
-
-            {form.promoMode === "FLAT" && (
+            <div className="space-y-2">
+              <Label htmlFor="image">Image URL</Label>
               <Input
-                name="value"
-                type="number"
-                placeholder="Flat Discount Amount (₹)"
-                value={form.value}
-                onChange={handleChange}
-                required
+                id="image"
+                {...form.register("image")}
+                placeholder="Image URL"
+                disabled={isLoading}
               />
-            )}
+              {/* Upload Button */}
+              <Input
+                type="file"
+                accept="image/*"
+                id={`upload-image`}
+                className=""
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
 
-            {form.promoMode === "BUNDLE" && (
-              <>
-                <Input
-                  name="bundleMinItems"
-                  type="number"
-                  placeholder="Exact number of items"
-                  value={form.bundleMinItems}
-                  onChange={handleChange}
-                  required
-                />
-
-                <Input
-                  name="bundlePrice"
-                  type="number"
-                  placeholder="Bundle Price (₹)"
-                  value={form.bundlePrice}
-                  onChange={handleChange}
-                  required
-                />
-
-                {/* Eligible Products */}
-                <div className="space-y-2">
-                  <Label>Eligible Products</Label>
-
-                  <select
-                    className="border rounded-md p-2 w-full"
-                    onChange={(e) => {
-                      const product = allProducts.find(
-                        (p) => p._id === e.target.value
-                      );
-                      if (
-                        product &&
-                        !selectedProducts.some(
-                          (p) => p._id === product._id
-                        )
-                      ) {
-                        setSelectedProducts([...selectedProducts, product]);
-                      }
-                    }}
-                  >
-                    <option value="">Select product</option>
-                    {allProducts.map((product) => (
-                      <option key={product._id} value={product._id}>
-                        {product.name}
-                      </option>
-                    ))}
-                  </select>
-
-                  {selectedProducts.length > 0 && (
-                    <div className="space-y-2">
-                      {selectedProducts.map((product) => (
-                        <div
-                          key={product._id}
-                          className="flex items-center justify-between border p-2 rounded-md"
-                        >
-                          <span className="text-sm">{product.name}</span>
-                          <Button
-                            type="button"
-                            size="icon"
-                            variant="outline"
-                            onClick={() =>
-                              setSelectedProducts((prev) =>
-                                prev.filter(
-                                  (p) => p._id !== product._id
-                                )
-                              )
-                            }
-                          >
-                            <Trash className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
-
-            {/* Common Fields */}
-            <Input
-              name="minimumOrder"
-              type="number"
-              placeholder="Minimum Order Amount (₹)"
-              value={form.minimumOrder}
-              onChange={handleChange}
-            />
-
-            <Input
-              name="expiryDate"
-              type="date"
-              value={form.expiryDate}
-              onChange={handleChange}
-              required
-            />
-
-            <Input
-              name="maxUses"
-              type="number"
-              placeholder="Maximum Uses (optional)"
-              value={form.maxUses}
-              onChange={handleChange}
-            />
-
-            {/* Toggles */}
-            <div className="flex gap-6">
-              <div className="flex items-center gap-2">
-                <Switch
-                  checked={form.oneTimeUsePerUser}
-                  onCheckedChange={(checked) =>
-                    setForm((p) => ({
-                      ...p,
-                      oneTimeUsePerUser: checked,
-                    }))
+                  try {
+                    const uploadedUrl = await uploadToS3(file);
+                    form.setValue("image", uploadedUrl);
+                  } catch (err) {
+                    console.error("Upload failed", err);
+                    alert("Image upload failed");
                   }
+                }}
+              />
+              <div className="h-12 w-12 rounded-md overflow-hidden bg-muted flex items-center justify-center">
+                <Image
+                  src={form.watch("image") || ""}
+                  alt={`Preview image`}
+                  className="h-full w-full object-cover"
+                  width={100}
+                  height={100}
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src =
+                      "https://placehold.co/100x100?text=Error";
+                  }}
                 />
-                <Label>One-time per user</Label>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Switch
-                  checked={form.active}
-                  onCheckedChange={(checked) =>
-                    setForm((p) => ({ ...p, active: checked }))
-                  }
-                />
-                <Label>Active</Label>
               </div>
             </div>
 
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Creating..." : "Create Promo Code"}
+            <div>
+              <Label htmlFor="product-select">Add Products to Category</Label>
+              <Select
+                onValueChange={(productId) => {
+                  const selected = allProducts.find((p) => p._id === productId);
+                  if (
+                    selected &&
+                    !selectedProducts.some((p) => p._id === selected._id)
+                  ) {
+                    const updated = [...selectedProducts, selected];
+                    setSelectedProducts(updated);
+                    form.setValue(
+                      "products",
+                      updated.map((p) => p._id)
+                    );
+                  }
+                }}
+              >
+                <SelectTrigger className="w-full mt-2">
+                  <SelectValue placeholder="Select product to add" />
+                </SelectTrigger>
+                <SelectContent>
+                  {allProducts.map((product) => (
+                    <SelectItem key={product._id} value={product._id}>
+                      {product.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {selectedProducts.length > 0 && (
+              <div className="space-y-2 mt-4">
+                <Label>Selected Products</Label>
+                {selectedProducts.map((product) => (
+                  <div
+                    key={product._id}
+                    className="flex items-center justify-between p-2 border rounded"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Image
+                        src={product.images[0] || ""}
+                        alt={product.name}
+                        width={50}
+                        height={50}
+                        className="rounded-md"
+                      />
+                      <span>{product.name}</span>
+                    </div>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="outline"
+                      onClick={() => {
+                        const updated = selectedProducts.filter(
+                          (p) => p._id !== product._id
+                        );
+                        setSelectedProducts(updated);
+                        form.setValue(
+                          "products",
+                          updated.map((p) => p._id)
+                        );
+                      }}
+                    >
+                      <Trash className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+          <CardFooter>
+            <Button type="submit" disabled={isLoading}>
+              Create Category
             </Button>
-          </form>
-        </CardContent>
-      </Card>
+          </CardFooter>
+        </Card>
+      </form>
     </div>
   );
 }
