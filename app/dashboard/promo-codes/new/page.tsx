@@ -2,46 +2,49 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import axios from 'axios';
+import Link from 'next/link';
+import { ArrowLeft } from 'lucide-react';
+
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { useToast } from '@/hooks/use-toast';
-import axios from 'axios';
-import { ArrowLeft } from 'lucide-react';
-import Link from 'next/link';
 import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/hooks/use-toast';
+
+type PromoMode = 'PERCENT' | 'FLAT' | 'BUNDLE';
 
 export default function NewPromoCodePage() {
-  const { toast } = useToast();
   const router = useRouter();
+  const { toast } = useToast();
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [form, setForm] = useState({
     code: '',
     description: '',
-    type: 'flat',
+    promoMode: 'FLAT' as PromoMode,
+
     value: '',
+    maxDiscount: '',
+
+    bundleMinItems: '',
+    bundlePrice: '',
+
     minimumOrder: '',
     expiryDate: '',
     maxUses: '',
     oneTimeUsePerUser: false,
-    active: true,
+    active: true
   });
 
-  console.log("form data:", form);
-
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
-    const target = e.target;
-    const { name, value, type } = target;
-    setForm(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? (target as HTMLInputElement).checked : value,
-    }));
+    const { name, value } = e.target;
+    setForm(prev => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -49,16 +52,43 @@ export default function NewPromoCodePage() {
     setIsSubmitting(true);
 
     try {
-      await axios.post(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/promo-code`, {
-        ...form,
-        value: parseFloat(form.value),
-        minimumOrder: parseFloat(form.minimumOrder),
-        maxUses: form.maxUses ? parseInt(form.maxUses) : undefined,
-      });
+      const payload: any = {
+        code: form.code.toUpperCase(),
+        description: form.description,
+        promoMode: form.promoMode,
+        expiryDate: form.expiryDate,
+        minimumOrder: form.minimumOrder ? Number(form.minimumOrder) : 0,
+        maxUses: form.maxUses ? Number(form.maxUses) : undefined,
+        oneTimeUsePerUser: form.oneTimeUsePerUser,
+        active: form.active
+      };
+
+      if (form.promoMode === 'PERCENT') {
+        payload.value = Number(form.value);
+        payload.maxDiscount = form.maxDiscount
+          ? Number(form.maxDiscount)
+          : undefined;
+      }
+
+      if (form.promoMode === 'FLAT') {
+        payload.value = Number(form.value);
+      }
+
+      if (form.promoMode === 'BUNDLE') {
+        payload.bundle = {
+          minItems: Number(form.bundleMinItems),
+          bundlePrice: Number(form.bundlePrice)
+        };
+      }
+
+      await axios.post(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/promo-code`,
+        payload
+      );
 
       toast({
         title: 'Promo code created',
-        description: 'Your new promo code has been saved successfully.',
+        description: 'Promo code has been created successfully.'
       });
 
       router.push('/dashboard/promo-codes');
@@ -66,8 +96,8 @@ export default function NewPromoCodePage() {
       console.error(error);
       toast({
         title: 'Error',
-        description: 'Failed to create promo code. Please try again.',
-        variant: 'destructive',
+        description: 'Failed to create promo code',
+        variant: 'destructive'
       });
     } finally {
       setIsSubmitting(false);
@@ -76,25 +106,27 @@ export default function NewPromoCodePage() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
+      {/* Header */}
       <div className="flex items-center gap-4">
         <Link href="/dashboard/promo-codes">
           <Button variant="outline" size="sm">
             <ArrowLeft className="h-4 w-4 mr-2" /> Back
           </Button>
         </Link>
-        <h2 className="text-3xl font-bold tracking-tight">New Promo Code</h2>
+        <h2 className="text-3xl font-bold">New Promo Code</h2>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Create a New Promo Code</CardTitle>
+          <CardTitle>Create Promo Code</CardTitle>
         </CardHeader>
+
         <CardContent>
           <form onSubmit={handleSubmit} className="grid gap-6">
+            {/* Code */}
             <div className="grid gap-2">
-              <Label htmlFor="code">Code</Label>
+              <Label>Code</Label>
               <Input
-                id="code"
                 name="code"
                 value={form.code}
                 onChange={handleChange}
@@ -103,100 +135,129 @@ export default function NewPromoCodePage() {
               />
             </div>
 
+            {/* Description */}
             <div className="grid gap-2">
-              <Label htmlFor="code">Short Description</Label>
+              <Label>Description</Label>
               <Textarea
-                id="description"
                 name="description"
                 value={form.description}
                 onChange={handleChange}
-                required
-                className=""
               />
             </div>
 
+            {/* Promo Mode */}
             <div className="grid gap-2">
-              <Label htmlFor="type">Discount Type</Label>
+              <Label>Promo Type</Label>
               <select
-                name="type"
-                id="type"
-                value={form.type}
+                name="promoMode"
+                value={form.promoMode}
                 onChange={handleChange}
                 className="border rounded-md p-2"
               >
-                <option value="flat">Flat (₹)</option>
-                <option value="percent">Percentage (%)</option>
+                <option value="FLAT">Flat Discount (₹)</option>
+                <option value="PERCENT">Percentage Discount (%)</option>
+                <option value="BUNDLE">Bundle Pricing</option>
               </select>
             </div>
 
-            <div className="grid gap-2">
-              <Label htmlFor="value">Discount Value</Label>
+            {/* Conditional Fields */}
+            {form.promoMode === 'PERCENT' && (
+              <>
+                <Input
+                  name="value"
+                  type="number"
+                  placeholder="Discount Percentage"
+                  value={form.value}
+                  onChange={handleChange}
+                  required
+                />
+                <Input
+                  name="maxDiscount"
+                  type="number"
+                  placeholder="Max Discount (₹)"
+                  value={form.maxDiscount}
+                  onChange={handleChange}
+                />
+              </>
+            )}
+
+            {form.promoMode === 'FLAT' && (
               <Input
-                type="number"
-                id="value"
                 name="value"
+                type="number"
+                placeholder="Flat Discount Amount (₹)"
                 value={form.value}
                 onChange={handleChange}
                 required
               />
-            </div>
+            )}
 
-            <div className="grid gap-2">
-              <Label htmlFor="minimumOrder">Minimum Order Amount</Label>
-              <Input
-                type="number"
-                id="minimumOrder"
-                name="minimumOrder"
-                value={form.minimumOrder}
-                onChange={handleChange}
-              />
-            </div>
+            {form.promoMode === 'BUNDLE' && (
+              <>
+                <Input
+                  name="bundleMinItems"
+                  type="number"
+                  placeholder="Minimum Items"
+                  value={form.bundleMinItems}
+                  onChange={handleChange}
+                  required
+                />
+                <Input
+                  name="bundlePrice"
+                  type="number"
+                  placeholder="Bundle Price (₹)"
+                  value={form.bundlePrice}
+                  onChange={handleChange}
+                  required
+                />
+              </>
+            )}
 
-            <div className="grid gap-2">
-              <Label htmlFor="expiryDate">Expiry Date</Label>
-              <Input
-                type="date"
-                id="expiryDate"
-                name="expiryDate"
-                value={form.expiryDate}
-                onChange={handleChange}
-                required
-              />
-            </div>
+            {/* Common Fields */}
+            <Input
+              name="minimumOrder"
+              type="number"
+              placeholder="Minimum Order Amount (₹)"
+              value={form.minimumOrder}
+              onChange={handleChange}
+            />
 
-            <div className="grid gap-2">
-              <Label htmlFor="maxUses">Maximum Uses (optional)</Label>
-              <Input
-                type="number"
-                id="maxUses"
-                name="maxUses"
-                value={form.maxUses}
-                onChange={handleChange}
-              />
-            </div>
+            <Input
+              name="expiryDate"
+              type="date"
+              value={form.expiryDate}
+              onChange={handleChange}
+              required
+            />
 
-            <div className="flex items-center gap-4">
+            <Input
+              name="maxUses"
+              type="number"
+              placeholder="Maximum Uses (optional)"
+              value={form.maxUses}
+              onChange={handleChange}
+            />
+
+            {/* Toggles */}
+            <div className="flex gap-6">
               <div className="flex items-center gap-2">
                 <Switch
-                  id="oneTimeUsePerUser"
-                  name="oneTimeUsePerUser"
                   checked={form.oneTimeUsePerUser}
-                  onCheckedChange={(checked) =>
-                    setForm(prev => ({ ...prev, oneTimeUsePerUser: checked }))
+                  onCheckedChange={checked =>
+                    setForm(p => ({ ...p, oneTimeUsePerUser: checked }))
                   }
                 />
-                <Label htmlFor="oneTimeUsePerUser">One-time use per user</Label>
+                <Label>One-time per user</Label>
               </div>
+
               <div className="flex items-center gap-2">
                 <Switch
-                  id="active"
-                  name="active"
                   checked={form.active}
-                  onCheckedChange={(checked) =>
-                    setForm(prev => ({ ...prev, active: checked }))
+                  onCheckedChange={checked =>
+                    setForm(p => ({ ...p, active: checked }))
                   }
                 />
-                <Label htmlFor="active">Active</Label>
+                <Label>Active</Label>
               </div>
             </div>
 

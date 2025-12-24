@@ -2,24 +2,34 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
+import axios from 'axios';
+
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { useToast } from '@/hooks/use-toast';
-import axios from 'axios';
 import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/hooks/use-toast';
 
-interface PromoCodeFormData {
+type PromoMode = 'PERCENT' | 'FLAT' | 'BUNDLE';
+
+interface PromoFormState {
   code: string;
-  description?: string;
-  type: 'percent' | 'flat';
-  value: number;
-  minimumOrder: number;
+  description: string;
+  promoMode: PromoMode;
+
+  value: string;
+  maxDiscount: string;
+
+  bundleMinItems: string;
+  bundlePrice: string;
+
+  minimumOrder: string;
   expiryDate: string;
-  maxUses?: number;
-  oneTimeUsePerUser?: boolean;
+  maxUses: string;
+
+  oneTimeUsePerUser: boolean;
   active: boolean;
 }
 
@@ -27,155 +37,271 @@ export default function EditPromoCodePage() {
   const { id } = useParams();
   const router = useRouter();
   const { toast } = useToast();
-  const [formData, setFormData] = useState<PromoCodeFormData | null>(null);
+
+  const [form, setForm] = useState<PromoFormState | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  /* -------------------------------------------------------------------------- */
+  /*                               FETCH PROMO                                  */
+  /* -------------------------------------------------------------------------- */
+
   useEffect(() => {
-    const fetchPromoCode = async () => {
+    if (!id) return;
+
+    const fetchPromo = async () => {
       try {
-        const response = await axios.get(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/promo-code/${id}`);
-        setFormData(response.data[0]);
+        const res = await axios.get(
+          `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/promo-code/${id}`
+        );
+
+        const promo = res.data;
+
+        setForm({
+          code: promo.code,
+          description: promo.description || '',
+          promoMode: promo.promoMode,
+
+          value: promo.value?.toString() || '',
+          maxDiscount: promo.maxDiscount?.toString() || '',
+
+          bundleMinItems: promo.bundle?.minItems?.toString() || '',
+          bundlePrice: promo.bundle?.bundlePrice?.toString() || '',
+
+          minimumOrder: promo.minimumOrder?.toString() || '',
+          expiryDate: promo.expiryDate.split('T')[0],
+          maxUses: promo.maxUses?.toString() || '',
+
+          oneTimeUsePerUser: promo.oneTimeUsePerUser || false,
+          active: promo.active
+        });
       } catch (error) {
-        console.error('Failed to fetch promo code:', error);
+        console.error(error);
         toast({
           title: 'Error',
-          description: 'Failed to load promo code details.',
-          variant: 'destructive',
+          description: 'Failed to load promo code',
+          variant: 'destructive'
         });
       }
     };
 
-    if (id) fetchPromoCode();
+    fetchPromo();
   }, [id, toast]);
 
-  const handleChange = (field: keyof PromoCodeFormData, value: any) => {
-    if (!formData) return;
-    setFormData({ ...formData, [field]: value });
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+  ) => {
+    const { name, value } = e.target;
+    setForm(prev => (prev ? { ...prev, [name]: value } : prev));
   };
+
+  /* -------------------------------------------------------------------------- */
+  /*                                 SUBMIT                                     */
+  /* -------------------------------------------------------------------------- */
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData) return;
+    if (!form) return;
 
     setIsSubmitting(true);
+
     try {
-      await axios.put(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/promo-code/${id}`, formData);
+      const payload: any = {
+        description: form.description,
+        promoMode: form.promoMode,
+        expiryDate: form.expiryDate,
+        minimumOrder: form.minimumOrder ? Number(form.minimumOrder) : 0,
+        maxUses: form.maxUses ? Number(form.maxUses) : undefined,
+        oneTimeUsePerUser: form.oneTimeUsePerUser,
+        active: form.active
+      };
+
+      if (form.promoMode === 'PERCENT') {
+        payload.value = Number(form.value);
+        payload.maxDiscount = form.maxDiscount
+          ? Number(form.maxDiscount)
+          : undefined;
+      }
+
+      if (form.promoMode === 'FLAT') {
+        payload.value = Number(form.value);
+      }
+
+      if (form.promoMode === 'BUNDLE') {
+        payload.bundle = {
+          minItems: Number(form.bundleMinItems),
+          bundlePrice: Number(form.bundlePrice)
+        };
+      }
+
+      await axios.put(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/promo-code/${id}`,
+        payload
+      );
+
       toast({
-        title: 'Updated Successfully',
-        description: 'Promo code updated successfully.',
+        title: 'Promo updated',
+        description: 'Promo code updated successfully'
       });
+
       router.push('/dashboard/promo-codes');
     } catch (error) {
-      console.error('Update failed:', error);
+      console.error(error);
       toast({
         title: 'Error',
-        description: 'Failed to update promo code.',
-        variant: 'destructive',
+        description: 'Failed to update promo code',
+        variant: 'destructive'
       });
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  if (!formData) {
-    return <div className="p-8">Loading...</div>;
+  if (!form) {
+    return <div className="p-8">Loading promo code...</div>;
   }
+
+  /* -------------------------------------------------------------------------- */
+  /*                                   UI                                       */
+  /* -------------------------------------------------------------------------- */
 
   return (
     <Card className="max-w-2xl mx-auto mt-8">
       <CardHeader>
         <CardTitle>Edit Promo Code</CardTitle>
       </CardHeader>
+
       <CardContent>
-        <form className="space-y-6" onSubmit={handleSubmit}>
-          <div>
-            <Label>Code</Label>
-            <Input
-              value={formData.code}
-              onChange={(e) => handleChange('code', e.target.value.toUpperCase())}
-              required
-              disabled
-            />
-          </div>
-
+        <form onSubmit={handleSubmit} className="grid gap-6">
+          {/* Code (read-only) */}
           <div className="grid gap-2">
-              <Label htmlFor="code">Short Description</Label>
-              <Textarea
-                id="description"
-                name="description"
-                value={formData.description}
-                onChange={(e) => handleChange('description', e.target.value)}
-                required
-                className=""
-              />
-            </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>Discount Type</Label>
-              <select
-                className="w-full border rounded-md h-10 px-2"
-                value={formData.type}
-                onChange={(e) => handleChange('type', e.target.value)}
-              >
-                <option value="percent">Percent</option>
-                <option value="flat">Flat</option>
-              </select>
-            </div>
-            <div>
-              <Label>Value</Label>
-              <Input
-                type="number"
-                value={formData.value}
-                onChange={(e) => handleChange('value', Number(e.target.value))}
-                required
-              />
-            </div>
+            <Label>Code</Label>
+            <Input value={form.code} disabled className="uppercase" />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>Minimum Order</Label>
-              <Input
-                type="number"
-                value={formData.minimumOrder}
-                onChange={(e) => handleChange('minimumOrder', Number(e.target.value))}
-              />
-            </div>
-            <div>
-              <Label>Max Uses</Label>
-              <Input
-                type="number"
-                value={formData.maxUses ?? ''}
-                onChange={(e) => handleChange('maxUses', Number(e.target.value) || undefined)}
-              />
-            </div>
+          {/* Description */}
+          <div className="grid gap-2">
+            <Label>Description</Label>
+            <Textarea
+              name="description"
+              value={form.description}
+              onChange={handleChange}
+            />
           </div>
 
-          <div>
-            <Label>Expiry Date</Label>
+          {/* Promo Mode */}
+          <div className="grid gap-2">
+            <Label>Promo Type</Label>
+            <select
+              name="promoMode"
+              value={form.promoMode}
+              onChange={handleChange}
+              className="border rounded-md p-2"
+            >
+              <option value="FLAT">Flat Discount (₹)</option>
+              <option value="PERCENT">Percentage Discount (%)</option>
+              <option value="BUNDLE">Bundle Pricing</option>
+            </select>
+          </div>
+
+          {/* Conditional Fields */}
+          {form.promoMode === 'PERCENT' && (
+            <>
+              <Input
+                name="value"
+                type="number"
+                placeholder="Discount Percentage"
+                value={form.value}
+                onChange={handleChange}
+                required
+              />
+              <Input
+                name="maxDiscount"
+                type="number"
+                placeholder="Max Discount (₹)"
+                value={form.maxDiscount}
+                onChange={handleChange}
+              />
+            </>
+          )}
+
+          {form.promoMode === 'FLAT' && (
             <Input
-              type="date"
-              value={formData.expiryDate.split('T')[0]} // Only date part
-              onChange={(e) => handleChange('expiryDate', e.target.value)}
+              name="value"
+              type="number"
+              placeholder="Flat Discount Amount (₹)"
+              value={form.value}
+              onChange={handleChange}
               required
             />
-          </div>
+          )}
 
-          <div className="flex items-center gap-2">
-            <Switch
-              checked={formData.oneTimeUsePerUser || false}
-              onCheckedChange={(checked) => handleChange('oneTimeUsePerUser', checked)}
-            />
-            <Label>One-time use per user</Label>
-          </div>
+          {form.promoMode === 'BUNDLE' && (
+            <>
+              <Input
+                name="bundleMinItems"
+                type="number"
+                placeholder="Minimum Items"
+                value={form.bundleMinItems}
+                onChange={handleChange}
+                required
+              />
+              <Input
+                name="bundlePrice"
+                type="number"
+                placeholder="Bundle Price (₹)"
+                value={form.bundlePrice}
+                onChange={handleChange}
+                required
+              />
+            </>
+          )}
 
-          <div className="flex items-center gap-2">
-            <Switch
-              checked={formData.active}
-              onCheckedChange={(checked) => handleChange('active', checked)}
-            />
-            <Label>Active</Label>
+          {/* Common */}
+          <Input
+            name="minimumOrder"
+            type="number"
+            placeholder="Minimum Order Amount (₹)"
+            value={form.minimumOrder}
+            onChange={handleChange}
+          />
+
+          <Input
+            name="expiryDate"
+            type="date"
+            value={form.expiryDate}
+            onChange={handleChange}
+            required
+          />
+
+          <Input
+            name="maxUses"
+            type="number"
+            placeholder="Maximum Uses (optional)"
+            value={form.maxUses}
+            onChange={handleChange}
+          />
+
+          {/* Toggles */}
+          <div className="flex gap-6">
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={form.oneTimeUsePerUser}
+                onCheckedChange={checked =>
+                  setForm(p => ({ ...p!, oneTimeUsePerUser: checked }))
+                }
+              />
+              <Label>One-time per user</Label>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={form.active}
+                onCheckedChange={checked =>
+                  setForm(p => ({ ...p!, active: checked }))
+                }
+              />
+              <Label>Active</Label>
+            </div>
           </div>
 
           <Button type="submit" disabled={isSubmitting}>
