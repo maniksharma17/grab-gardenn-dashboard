@@ -13,7 +13,6 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
-  CardFooter,
 } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -66,17 +65,17 @@ export default function EditPromoCodePage() {
   });
 
   /* -------------------------------------------------------------------------- */
-  /*                              FETCH PRODUCTS                                */
+  /*                               FETCH PRODUCTS                               */
   /* -------------------------------------------------------------------------- */
 
   useEffect(() => {
     axios
-      .get(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/products?limit=300`)
+      .get(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/products?limit=200`)
       .then((res) => setAllProducts(res.data.products || []))
       .catch(() =>
         toast({
           title: "Error",
-          description: "Failed to load products",
+          description: "Failed to fetch products",
           variant: "destructive",
         })
       );
@@ -93,7 +92,7 @@ export default function EditPromoCodePage() {
           `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/promo-code/${id}`
         );
 
-        const promo = res.data;
+        const promo = res.data[0];
 
         setForm({
           code: promo.code,
@@ -113,8 +112,8 @@ export default function EditPromoCodePage() {
           active: promo.active,
         });
 
-        // Map eligible product IDs → full objects
-        if (promo.eligibleProducts?.length && allProducts.length) {
+        // Map eligible product IDs → full product objects
+        if (promo.eligibleProducts?.length) {
           const mapped = allProducts.filter((p) =>
             promo.eligibleProducts.includes(p._id)
           );
@@ -135,7 +134,7 @@ export default function EditPromoCodePage() {
   }, [id, allProducts, toast]);
 
   /* -------------------------------------------------------------------------- */
-  /*                             MODE SWITCH RESET                               */
+  /*                              MODE CLEANUP                                  */
   /* -------------------------------------------------------------------------- */
 
   useEffect(() => {
@@ -154,7 +153,7 @@ export default function EditPromoCodePage() {
   }, [form.promoMode]);
 
   /* -------------------------------------------------------------------------- */
-  /*                                 HANDLERS                                   */
+  /*                                  HANDLERS                                  */
   /* -------------------------------------------------------------------------- */
 
   const handleChange = (
@@ -169,8 +168,8 @@ export default function EditPromoCodePage() {
 
     if (form.promoMode === "BUNDLE" && selectedProducts.length === 0) {
       toast({
-        title: "Validation error",
-        description: "Select at least one eligible product for bundle promo",
+        title: "Select products",
+        description: "Please select eligible products for bundle promo",
         variant: "destructive",
       });
       return;
@@ -183,7 +182,7 @@ export default function EditPromoCodePage() {
         description: form.description,
         promoMode: form.promoMode,
         expiryDate: form.expiryDate,
-        minimumOrder: Number(form.minimumOrder) || 0,
+        minimumOrder: form.minimumOrder ? Number(form.minimumOrder) : 0,
         maxUses: form.maxUses ? Number(form.maxUses) : undefined,
         oneTimeUsePerUser: form.oneTimeUsePerUser,
         active: form.active,
@@ -238,6 +237,7 @@ export default function EditPromoCodePage() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
+      {/* Header */}
       <div className="flex items-center gap-4">
         <Link href="/dashboard/promo-codes">
           <Button variant="outline" size="sm">
@@ -249,37 +249,201 @@ export default function EditPromoCodePage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>{form.code}</CardTitle>
+          <CardTitle>Edit Promo Code</CardTitle>
         </CardHeader>
 
         <CardContent>
           <form onSubmit={handleSubmit} className="grid gap-6">
-            <Textarea
-              name="description"
-              placeholder="Description"
-              value={form.description}
+            {/* Code (read-only) */}
+            <div className="grid gap-2">
+              <Label>Code</Label>
+              <Input value={form.code} disabled className="uppercase" />
+            </div>
+
+            {/* Description */}
+            <div className="grid gap-2">
+              <Label>Description</Label>
+              <Textarea
+                name="description"
+                value={form.description}
+                onChange={handleChange}
+              />
+            </div>
+
+            {/* Promo Mode */}
+            <div className="grid gap-2">
+              <Label>Promo Type</Label>
+              <select
+                name="promoMode"
+                value={form.promoMode}
+                onChange={handleChange}
+                className="border rounded-md p-2"
+              >
+                <option value="FLAT">Flat Discount (₹)</option>
+                <option value="PERCENT">Percentage Discount (%)</option>
+                <option value="BUNDLE">Bundle Pricing</option>
+              </select>
+            </div>
+
+            {/* Conditional fields – IDENTICAL to create page */}
+            {form.promoMode === "PERCENT" && (
+              <>
+                <Input
+                  name="value"
+                  type="number"
+                  placeholder="Discount Percentage"
+                  value={form.value}
+                  onChange={handleChange}
+                  required
+                />
+                <Input
+                  name="maxDiscount"
+                  type="number"
+                  placeholder="Max Discount (₹)"
+                  value={form.maxDiscount}
+                  onChange={handleChange}
+                />
+              </>
+            )}
+
+            {form.promoMode === "FLAT" && (
+              <Input
+                name="value"
+                type="number"
+                placeholder="Flat Discount Amount (₹)"
+                value={form.value}
+                onChange={handleChange}
+                required
+              />
+            )}
+
+            {form.promoMode === "BUNDLE" && (
+              <>
+                <Input
+                  name="bundleMinItems"
+                  type="number"
+                  placeholder="Exact number of items"
+                  value={form.bundleMinItems}
+                  onChange={handleChange}
+                  required
+                />
+                <Input
+                  name="bundlePrice"
+                  type="number"
+                  placeholder="Bundle Price (₹)"
+                  value={form.bundlePrice}
+                  onChange={handleChange}
+                  required
+                />
+
+                {/* Eligible Products */}
+                <div className="space-y-2">
+                  <Label>Eligible Products</Label>
+
+                  <select
+                    className="border rounded-md p-2 w-full"
+                    onChange={(e) => {
+                      const product = allProducts.find(
+                        (p) => p._id === e.target.value
+                      );
+                      if (
+                        product &&
+                        !selectedProducts.some(
+                          (p) => p._id === product._id
+                        )
+                      ) {
+                        setSelectedProducts([...selectedProducts, product]);
+                      }
+                    }}
+                  >
+                    <option value="">Select product</option>
+                    {allProducts.map((product) => (
+                      <option key={product._id} value={product._id}>
+                        {product.name}
+                      </option>
+                    ))}
+                  </select>
+
+                  {selectedProducts.map((product) => (
+                    <div
+                      key={product._id}
+                      className="flex items-center justify-between border p-2 rounded-md"
+                    >
+                      <span className="text-sm">{product.name}</span>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="outline"
+                        onClick={() =>
+                          setSelectedProducts((prev) =>
+                            prev.filter(
+                              (p) => p._id !== product._id
+                            )
+                          )
+                        }
+                      >
+                        <Trash className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {/* Common fields */}
+            <Input
+              name="minimumOrder"
+              type="number"
+              placeholder="Minimum Order Amount (₹)"
+              value={form.minimumOrder}
               onChange={handleChange}
             />
 
-            <Label>Promo Type</Label>
-            <select
-              name="promoMode"
-              value={form.promoMode}
+            <Input
+              name="expiryDate"
+              type="date"
+              value={form.expiryDate}
               onChange={handleChange}
-              className="border rounded-md p-2"
-            >
-              <option value="FLAT">Flat</option>
-              <option value="PERCENT">Percent</option>
-              <option value="BUNDLE">Bundle</option>
-            </select>
+              required
+            />
 
-            {/* Remaining UI unchanged logic-wise */}
+            <Input
+              name="maxUses"
+              type="number"
+              placeholder="Maximum Uses (optional)"
+              value={form.maxUses}
+              onChange={handleChange}
+            />
 
-            <CardFooter className="p-0">
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? "Saving…" : "Save Changes"}
-              </Button>
-            </CardFooter>
+            {/* Toggles */}
+            <div className="flex gap-6">
+              <div className="flex items-center gap-2">
+                <Switch
+                  checked={form.oneTimeUsePerUser}
+                  onCheckedChange={(checked) =>
+                    setForm((p) => ({
+                      ...p,
+                      oneTimeUsePerUser: checked,
+                    }))
+                  }
+                />
+                <Label>One-time per user</Label>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Switch
+                  checked={form.active}
+                  onCheckedChange={(checked) =>
+                    setForm((p) => ({ ...p, active: checked }))
+                  }
+                />
+                <Label>Active</Label>
+              </div>
+            </div>
+
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? "Saving..." : "Save Changes"}
+            </Button>
           </form>
         </CardContent>
       </Card>
