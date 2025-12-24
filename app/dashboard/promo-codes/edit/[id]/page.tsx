@@ -92,7 +92,7 @@ export default function EditPromoCodePage() {
           `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/promo-code/${id}`
         );
 
-        const promo = res.data[0];
+        const promo = res.data;
 
         setForm({
           code: promo.code,
